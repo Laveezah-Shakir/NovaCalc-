@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="default">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NovaCalc</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/10.6.4/math.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@600;800&display=swap" rel="stylesheet">
+  <style>
+    :root, [data-theme="default"] {
+      --bg:         #1a1035;
+      --surface:    #2a1a52;
+      --raised:     #33206a;
+      --border:     rgba(180,130,255,0.18);
+      --accent:     #a78bfa;
+      --accent2:    #f472b6;
+      --op-color:   #fb923c;
+      --fn-color:   #34d399;
+      --text:       #f0eaff;
+      --muted:      #7c6f9e;
+      --display-bg: #130c2e;
+      --eq-bg:      linear-gradient(135deg,#a78bfa,#7c3aed);
+      --eq-shadow:  rgba(167,139,250,0.4);
+      --clear-color:#f87171;
+      --card-shadow:0 32px 80px rgba(0,0,0,0.6);
+      --grid-color: rgba(167,139,250,0.05);
+      --btn-hover:  rgba(255,255,255,0.06);
+    }
+    [data-theme="dark"] {
+      --bg:         #0b0c10;
+      --surface:    #13141c;
+      --raised:     #1c1e2a;
+      --border:     rgba(255,255,255,0.07);
+      --accent:     #00e5ff;
+      --accent2:    #ff6b6b;
+      --op-color:   #f0a500;
+      --fn-color:   #00e5ff;
+      --text:       #e8eaf0;
+      --muted:      #4a4d60;
+      --display-bg: #070809;
+      --eq-bg:      linear-gradient(135deg,#00e5ff,#0077aa);
+      --eq-shadow:  rgba(0,229,255,0.35);
+      --clear-color:#ff6b6b;
+      --card-shadow:0 32px 80px rgba(0,0,0,0.8);
+      --grid-color: rgba(0,229,255,0.04);
+      --btn-hover:  rgba(255,255,255,0.05);
+    }
+    [data-theme="light"] {
+      --bg:         #f0f4ff;
+      --surface:    #ffffff;
+      --raised:     #f5f7ff;
+      --border:     rgba(99,102,241,0.15);
+      --accent:     #6366f1;
+      --accent2:    #ec4899;
+      --op-color:   #f97316;
+      --fn-color:   #10b981;
+      --text:       #1e1b4b;
+      --muted:      #94a3b8;
+      --display-bg: #eef0fb;
+      --eq-bg:      linear-gradient(135deg,#6366f1,#4f46e5);
+      --eq-shadow:  rgba(99,102,241,0.4);
+      --clear-color:#ef4444;
+      --card-shadow:0 20px 60px rgba(99,102,241,0.15);
+      --grid-color: rgba(99,102,241,0.05);
+      --btn-hover:  rgba(99,102,241,0.06);
+    }
+
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Syne', sans-serif;
+      transition: background 0.35s;
+      padding: 16px;
+    }
+
+    body::before {
+      content:'';
+      position:fixed; inset:0;
+      background-image:
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+      background-size: 38px 38px;
+      pointer-events:none;
+    }
+
+    /* THEME BAR */
+    .theme-bar {
+      display: flex; gap: 6px; margin-bottom: 14px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 40px; padding: 5px;
+      box-shadow: var(--card-shadow);
+      transition: background 0.35s;
+      position: relative; z-index:1;
+    }
+    .theme-btn {
+      font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700;
+      letter-spacing: 1px; text-transform: uppercase;
+      padding: 6px 14px; border-radius: 30px; border: none;
+      background: transparent; color: var(--muted); cursor: pointer;
+      transition: all 0.22s;
+    }
+    .theme-btn.active { background: var(--accent); color: #fff; box-shadow: 0 2px 12px var(--eq-shadow); }
+
+    /* CALCULATOR */
+    .calculator {
+      width: 100%; max-width: 430px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 28px; padding: 20px;
+      box-shadow: var(--card-shadow), inset 0 1px 0 rgba(255,255,255,0.06);
+      transition: background 0.35s, border-color 0.35s;
+      animation: popIn 0.5s cubic-bezier(0.16,1,0.3,1) both;
+      position: relative; z-index:1;
+    }
+    @keyframes popIn {
+      from { opacity:0; transform:translateY(24px) scale(0.96); }
+      to   { opacity:1; transform:none; }
+    }
+
+    /* TOP BAR */
+    .top-bar {
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:14px; gap:8px; flex-wrap:wrap;
+    }
+    .calc-title { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:var(--accent); opacity:0.8; }
+    .angle-toggle {
+      display:flex; background:var(--display-bg); border:1px solid var(--border);
+      border-radius:20px; overflow:hidden;
+      font-family:'JetBrains Mono',monospace; font-size:10px;
+    }
+    .angle-toggle span {
+      padding:4px 11px; color:var(--muted); cursor:pointer; transition:all 0.2s; user-select:none;
+    }
+    .angle-toggle span.active { background:var(--accent); color:#fff; font-weight:700; }
+
+    /* DISPLAY */
+    .display-wrap {
+      background: var(--display-bg); border:1px solid var(--border);
+      border-radius:16px; padding:14px 18px 12px;
+      margin-bottom:12px; min-height:92px;
+      display:flex; flex-direction:column; justify-content:flex-end;
+      position:relative; overflow:hidden; transition:background 0.35s;
+    }
+    .display-wrap::after {
+      content:''; position:absolute; top:0; left:10%; right:10%; height:1px;
+      background:linear-gradient(90deg,transparent,var(--accent),transparent); opacity:0.4;
+    }
+    .disp-top {
+      display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;
+    }
+    #expr { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); word-break:break-all; flex:1; }
+    .mem-badge {
+      font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--accent);
+      background:rgba(128,128,255,0.12); border-radius:4px; padding:2px 6px; margin-left:8px; display:none;
+    }
+    .mem-badge.show { display:inline; }
+    .hist-toggle {
+      font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted);
+      background:transparent; border:none; cursor:pointer; padding:2px 6px;
+      border-radius:4px; transition:color 0.2s; white-space:nowrap;
+    }
+    .hist-toggle:hover { color:var(--accent); }
+    #display {
+      font-family:'JetBrains Mono',monospace;
+      font-size: clamp(1.5rem,6vw,2.3rem);
+      color:var(--text); text-align:right; word-break:break-all; line-height:1.1;
+      transition:color 0.18s; min-height:1.2em;
+    }
+    #display.error  { color:var(--clear-color); font-size:clamp(1rem,4vw,1.3rem); }
+    #display.result { color:var(--accent); filter:brightness(1.1); }
+
+    /* HISTORY */
+    .history-panel {
+      background:var(--display-bg); border:1px solid var(--border); border-radius:12px;
+      max-height:0; overflow:hidden; transition:max-height 0.35s ease, padding 0.25s; margin-bottom:0;
+    }
+    .history-panel.open { max-height:150px; padding:10px 14px; margin-bottom:10px; overflow-y:auto; }
+    .history-panel::-webkit-scrollbar { width:3px; }
+    .history-panel::-webkit-scrollbar-thumb { background:var(--border); border-radius:10px; }
+    .hist-item {
+      font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted);
+      padding:5px 0; border-bottom:1px solid var(--border); cursor:pointer;
+      transition:color 0.15s; display:flex; justify-content:space-between; gap:8px;
+    }
+    .hist-item:hover { color:var(--text); }
+    .hist-item:last-child { border-bottom:none; }
+    .hist-item .hi-r { color:var(--accent); white-space:nowrap; }
+
+    /* TABS */
+    .tabs {
+      display:flex; gap:4px; margin-bottom:12px;
+      background:var(--display-bg); border-radius:12px; padding:4px;
+      border:1px solid var(--border);
+    }
+    .tab {
+      flex:1; font-family:'Syne',sans-serif; font-size:11px; font-weight:700;
+      padding:7px; border-radius:8px; border:none; background:transparent;
+      color:var(--muted); cursor:pointer; transition:all 0.2s; letter-spacing:0.5px;
+    }
+    .tab.active { background:var(--accent); color:#fff; }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    /* BUTTONS */
+    .buttons { display:grid; gap:7px; }
+    .g5 { grid-template-columns:repeat(5,1fr); }
+    .g4 { grid-template-columns:repeat(4,1fr); }
+
+    button.cb {
+      font-family:'Syne',sans-serif; font-size:clamp(10px,3vw,13px); font-weight:700;
+      height:clamp(42px,10vw,52px); border:1px solid var(--border); border-radius:12px;
+      background:var(--raised); color:var(--text); cursor:pointer;
+      transition:background 0.12s, transform 0.08s, border-color 0.15s;
+      position:relative; overflow:hidden; user-select:none;
+      display:flex; align-items:center; justify-content:center;
+    }
+    button.cb:hover  { background:var(--btn-hover); border-color:var(--accent); }
+    button.cb:active { transform:scale(0.91); }
+    button.cb.fn    { color:var(--fn-color); background:color-mix(in srgb,var(--fn-color) 9%,var(--raised)); font-size:clamp(9px,2.5vw,12px); }
+    button.cb.op    { color:var(--op-color); background:color-mix(in srgb,var(--op-color) 9%,var(--raised)); }
+    button.cb.cl    { color:var(--clear-color); background:color-mix(in srgb,var(--clear-color) 9%,var(--raised)); }
+    button.cb.mem   { color:var(--accent2); background:color-mix(in srgb,var(--accent2) 9%,var(--raised)); font-size:clamp(9px,2.5vw,11px); }
+    button.cb.eq    {
+      background:var(--eq-bg); color:#fff; border-color:transparent;
+      box-shadow:0 4px 18px var(--eq-shadow); font-size:clamp(14px,4vw,18px);
+    }
+    button.cb.eq:hover { filter:brightness(1.12); }
+    button.cb.w2 { grid-column:span 2; }
+    button.cb.w3 { grid-column:span 3; }
+
+    /* Ripple */
+    .rip {
+      position:absolute; border-radius:50%; width:56px; height:56px;
+      background:var(--accent); opacity:0; pointer-events:none;
+      animation:ripAnim 0.45s ease-out forwards;
+    }
+    @keyframes ripAnim {
+      from { transform:scale(0); opacity:0.25; }
+      to   { transform:scale(3.5); opacity:0; }
+    }
+
+    /* CONVERTER */
+    .converter { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .cv-group { display:flex; flex-direction:column; gap:4px; }
+    .cv-label { font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
+    .cv-input, .cv-select {
+      background:var(--display-bg); border:1px solid var(--border);
+      border-radius:8px; padding:8px 10px;
+      font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text);
+      outline:none; width:100%; transition:border-color 0.2s;
+    }
+    .cv-input:focus, .cv-select:focus { border-color:var(--accent); }
+    .cv-select option { background:var(--surface); }
+    .cv-result {
+      grid-column:span 2; background:var(--display-bg); border:1px solid var(--border);
+      border-radius:8px; padding:10px 14px;
+      font-family:'JetBrains Mono',monospace; font-size:13px;
+      color:var(--accent); text-align:center; min-height:38px; display:flex; align-items:center; justify-content:center;
+    }
+    .cv-send {
+      grid-column:span 2; font-family:'Syne',sans-serif; font-weight:700; font-size:12px;
+      padding:10px; border-radius:10px; border:none; background:var(--eq-bg); color:#fff;
+      cursor:pointer; transition:filter 0.2s;
+    }
+    .cv-send:hover { filter:brightness(1.1); }
+
+    /* RESPONSIVE */
+    @media (max-width:400px) {
+      .calculator { padding:14px; border-radius:20px; }
+      .buttons { gap:5px; }
+      button.cb { border-radius:9px; }
+    }
+    @media (max-width:320px) {
+      .g5 { grid-template-columns:repeat(4,1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="theme-bar">
+  <button class="theme-btn active" onclick="setTheme('default',this)"> Default</button>
+  <button class="theme-btn"        onclick="setTheme('dark',this)"> Dark</button>
+  <button class="theme-btn"        onclick="setTheme('light',this)"> Light</button>
+</div>
+
+<div class="calculator">
+  <div class="top-bar">
+    <span class="calc-title">Scientific</span>
+    <div class="angle-toggle">
+      <span class="active" id="deg-btn" onclick="setAngle('deg')">DEG</span>
+      <span id="rad-btn" onclick="setAngle('rad')">RAD</span>
+    </div>
+  </div>
+
+  <div class="display-wrap">
+    <div class="disp-top">
+      <span id="expr"></span>
+      <span class="mem-badge" id="mem-badge">M</span>
+      <button class="hist-toggle" onclick="toggleHistory()">⏱ History</button>
+    </div>
+    <div id="display">0</div>
+  </div>
+
+  <div class="history-panel" id="history-panel"></div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('calc',this)">Calculator</button>
+    <button class="tab"        onclick="switchTab('sci',this)">Functions</button>
+    <button class="tab"        onclick="switchTab('conv',this)">Convert</button>
+  </div>
+
+  <!-- TAB: CALCULATOR -->
+  <div class="tab-panel active" id="tab-calc">
+    <div class="buttons g5">
+      <button class="cb mem"  onclick="memStore()">MS</button>
+      <button class="cb mem"  onclick="memRecall()">MR</button>
+      <button class="cb mem"  onclick="memClear()">MC</button>
+      <button class="cb mem"  onclick="memAdd()">M+</button>
+      <button class="cb cl"   onclick="clearAll()">AC</button>
+
+      <button class="cb fn"   onclick="append('(')"> ( </button>
+      <button class="cb fn"   onclick="append(')')"> ) </button>
+      <button class="cb op"   onclick="append('%')">%</button>
+      <button class="cb cl"   onclick="backspace()">⌫</button>
+      <button class="cb op"   onclick="append('/')">÷</button>
+
+      <button class="cb" onclick="append('7')">7</button>
+      <button class="cb" onclick="append('8')">8</button>
+      <button class="cb" onclick="append('9')">9</button>
+      <button class="cb op"   onclick="append('*')">×</button>
+      <button class="cb fn"   onclick="append('^(')">xʸ</button>
+
+      <button class="cb" onclick="append('4')">4</button>
+      <button class="cb" onclick="append('5')">5</button>
+      <button class="cb" onclick="append('6')">6</button>
+      <button class="cb op"   onclick="append('-')">−</button>
+      <button class="cb fn"   onclick="append('sqrt(')">√</button>
+
+      <button class="cb" onclick="append('1')">1</button>
+      <button class="cb" onclick="append('2')">2</button>
+      <button class="cb" onclick="append('3')">3</button>
+      <button class="cb op"   onclick="append('+')">+</button>
+      <button class="cb fn"   onclick="append('!')">n!</button>
+
+      <button class="cb w2"   onclick="append('0')">0</button>
+      <button class="cb"      onclick="addDecimal()">.</button>
+      <button class="cb fn"   onclick="toggleSign()">±</button>
+      <button class="cb eq"   onclick="calculate()">=</button>
+    </div>
+  </div>
+
+  <!-- TAB: FUNCTIONS -->
+  <div class="tab-panel" id="tab-sci">
+    <div class="buttons g4">
+      <button class="cb fn" onclick="append('sin(')">sin</button>
+      <button class="cb fn" onclick="append('cos(')">cos</button>
+      <button class="cb fn" onclick="append('tan(')">tan</button>
+      <button class="cb fn" onclick="append('cot(')">cot</button>
+
+      <button class="cb fn" onclick="append('asin(')">sin⁻¹</button>
+      <button class="cb fn" onclick="append('acos(')">cos⁻¹</button>
+      <button class="cb fn" onclick="append('atan(')">tan⁻¹</button>
+      <button class="cb fn" onclick="append('atan2(')">atan2</button>
+
+      <button class="cb fn" onclick="append('sinh(')">sinh</button>
+      <button class="cb fn" onclick="append('cosh(')">cosh</button>
+      <button class="cb fn" onclick="append('tanh(')">tanh</button>
+      <button class="cb fn" onclick="append('asinh(')">sinh⁻¹</button>
+
+      <button class="cb fn" onclick="append('log(')">log₁₀</button>
+      <button class="cb fn" onclick="append('log2(')">log₂</button>
+      <button class="cb fn" onclick="append('ln(')">ln</button>
+      <button class="cb fn" onclick="append('exp(')">eˣ</button>
+
+      <button class="cb fn" onclick="append('pi')">π</button>
+      <button class="cb fn" onclick="append('e')">e</button>
+      <button class="cb fn" onclick="append('1.6180339887')">φ</button>
+      <button class="cb fn" onclick="append('abs(')">|x|</button>
+
+      <button class="cb fn" onclick="append('ceil(')">⌈x⌉</button>
+      <button class="cb fn" onclick="append('floor(')">⌊x⌋</button>
+      <button class="cb fn" onclick="append('round(')">round</button>
+      <button class="cb fn" onclick="append('cbrt(')">∛</button>
+
+      <button class="cb fn" onclick="append('nthRoot(')">ⁿ√</button>
+      <button class="cb fn" onclick="append('gcd(')">gcd</button>
+      <button class="cb fn" onclick="append('lcm(')">lcm</button>
+      <button class="cb fn" onclick="append('mod(')">mod</button>
+
+      <button class="cb eq w2" onclick="calculate()">=</button>
+      <button class="cb cl w2" onclick="clearAll()">AC</button>
+    </div>
+  </div>
+
+  <!-- TAB: CONVERTER -->
+  <div class="tab-panel" id="tab-conv">
+    <div class="converter">
+      <div class="cv-group" style="grid-column:span 2">
+        <label class="cv-label">Category</label>
+        <select class="cv-select" id="conv-cat" onchange="updateConvUnits()">
+          <option value="length">Length</option>
+          <option value="weight">Weight / Mass</option>
+          <option value="temp">Temperature</option>
+          <option value="area">Area</option>
+          <option value="speed">Speed</option>
+          <option value="data">Data Storage</option>
+          <option value="time">Time</option>
+          <option value="energy">Energy</option>
+        </select>
+      </div>
+      <div class="cv-group">
+        <label class="cv-label">From</label>
+        <select class="cv-select" id="conv-from" onchange="convertUnits()"></select>
+      </div>
+      <div class="cv-group">
+        <label class="cv-label">To</label>
+        <select class="cv-select" id="conv-to" onchange="convertUnits()"></select>
+      </div>
+      <div class="cv-group" style="grid-column:span 2">
+        <label class="cv-label">Value</label>
+        <input class="cv-input" id="conv-val" type="number" placeholder="Enter value…" oninput="convertUnits()">
+      </div>
+      <div class="cv-result" id="conv-result">—</div>
+      <button class="cv-send" onclick="sendConvToCalc()">Send to Calculator →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── STATE ── */
+let current='', isDeg=true, memory=0, justCalc=false, historyLog=[];
+
+/* ── THEME ── */
+function setTheme(t,btn){
+  document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+/* ── ANGLE ── */
+function setAngle(m){
+  isDeg=m==='deg';
+  document.getElementById('deg-btn').classList.toggle('active',isDeg);
+  document.getElementById('rad-btn').classList.toggle('active',!isDeg);
+}
+
+/* ── DISPLAY ── */
+const disp=document.getElementById('display');
+const exprEl=document.getElementById('expr');
+function updateDisplay(val,cls){ disp.textContent=val||'0'; disp.className=cls||''; }
+
+/* ── TABS ── */
+function switchTab(id,btn){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+
+/* ── HISTORY ── */
+function toggleHistory(){
+  document.getElementById('history-panel').classList.toggle('open');
+}
+function addHistory(expr,result){
+  historyLog.unshift({expr,result});
+  if(historyLog.length>15) historyLog.pop();
+  renderHistory();
+}
+function renderHistory(){
+  const p=document.getElementById('history-panel');
+  if(!historyLog.length){
+    p.innerHTML='<div style="color:var(--muted);font-size:11px;font-family:JetBrains Mono,monospace;text-align:center;padding:8px">No history yet</div>';
+    return;
+  }
+  p.innerHTML=historyLog.map(h=>
+    `<div class="hist-item" onclick="loadHistory('${h.result}')">
+      <span>${String(h.expr).replace(/</g,'&lt;')}</span>
+      <span class="hi-r">= ${h.result}</span>
+    </div>`
+  ).join('');
+}
+function loadHistory(val){
+  current=String(val); updateDisplay(current); exprEl.textContent=''; justCalc=false;
+}
+
+/* ── MEMORY ── */
+function memStore()  { memory=parseFloat(disp.textContent)||0; updateMemBadge(); }
+function memRecall() { if(memory!==0) append(String(memory)); }
+function memClear()  { memory=0; updateMemBadge(); }
+function memAdd()    { memory+=parseFloat(disp.textContent)||0; updateMemBadge(); }
+function updateMemBadge(){
+  document.getElementById('mem-badge').classList.toggle('show',memory!==0);
+}
+
+/* ── INPUT ── */
+function append(val){
+  if(justCalc && /^[\d(pieπφ]/.test(val)) current='';
+  justCalc=false;
+  current+=val;
+  exprEl.textContent='';
+  updateDisplay(current);
+}
+function clearAll(){ current=''; justCalc=false; exprEl.textContent=''; updateDisplay('0'); }
+function backspace(){ current=current.slice(0,-1); updateDisplay(current||'0'); }
+function addDecimal(){
+  const parts=current.split(/[+\-*/(%^,]/);
+  if(!parts[parts.length-1].includes('.')) append('.');
+}
+function toggleSign(){
+  if(!current) return;
+  current=current.startsWith('-')?current.slice(1):'-'+current;
+  updateDisplay(current);
+}
+
+/* ── CALCULATE ── */
+function calculate(){
+  if(!current) return;
+  const raw=current;
+  exprEl.textContent=raw+' =';
+  try{
+    let expr=current;
+    if(isDeg){
+      ['sin','cos','tan','asin','acos','atan','cot','sinh','cosh','tanh','asinh'].forEach(fn=>{
+        expr=expr.replace(new RegExp(fn+'\\(','g'),fn+'(pi/180*');
+      });
+    }
+    expr=expr.replace(/ln\(/g,'log(');
+    expr=expr.replace(/cot\(/g,'(1/tan(');
+    let result=math.evaluate(expr);
+    if(typeof result==='number') result=parseFloat(result.toPrecision(12));
+    addHistory(raw,result);
+    current=String(result);
+    updateDisplay(current,'result');
+    justCalc=true;
+  } catch {
+    updateDisplay('Syntax Error','error');
+    setTimeout(()=>updateDisplay(current||'0'),2000);
+  }
+}
+
+/* ── KEYBOARD ── */
+document.addEventListener('keydown',e=>{
+  if(e.key>='0'&&e.key<='9') append(e.key);
+  else if(e.key==='+') append('+');
+  else if(e.key==='-') append('-');
+  else if(e.key==='*') append('*');
+  else if(e.key==='/'){e.preventDefault();append('/');}
+  else if(e.key==='.') addDecimal();
+  else if(e.key==='Enter'||e.key==='=') calculate();
+  else if(e.key==='Backspace') backspace();
+  else if(e.key==='Escape') clearAll();
+  else if(e.key==='(') append('(');
+  else if(e.key===')') append(')');
+  else if(e.key==='%') append('%');
+  else if(e.key==='^') append('^(');
+});
+
+/* ── RIPPLE ── */
+document.querySelectorAll('button.cb').forEach(btn=>{
+  btn.addEventListener('click',function(e){
+    const r=document.createElement('span');
+    r.className='rip';
+    const rect=this.getBoundingClientRect();
+    r.style.left=(e.clientX-rect.left-28)+'px';
+    r.style.top=(e.clientY-rect.top-28)+'px';
+    this.appendChild(r);
+    setTimeout(()=>r.remove(),500);
+  });
+});
+
+/* ── CONVERTER ── */
+const convData={
+  length:{ units:['Meter','Kilometer','Centimeter','Millimeter','Mile','Yard','Foot','Inch','Nautical Mile'], toBase:[1,1000,0.01,0.001,1609.344,0.9144,0.3048,0.0254,1852] },
+  weight:{ units:['Kilogram','Gram','Milligram','Pound','Ounce','Tonne','Stone'], toBase:[1,0.001,1e-6,0.453592,0.0283495,1000,6.35029] },
+  area:  { units:['m²','km²','cm²','Hectare','Acre','ft²','in²','mi²'], toBase:[1,1e6,1e-4,10000,4046.856,0.092903,6.4516e-4,2589988] },
+  speed: { units:['m/s','km/h','mph','Knot','ft/s'], toBase:[1,0.277778,0.44704,0.514444,0.3048] },
+  data:  { units:['Bit','Byte','Kilobyte','Megabyte','Gigabyte','Terabyte','Petabyte'], toBase:[1,8,8192,8388608,8589934592,8.796e12,9.007e15] },
+  time:  { units:['Second','Minute','Hour','Day','Week','Month','Year'], toBase:[1,60,3600,86400,604800,2629800,31557600] },
+  energy:{ units:['Joule','Kilojoule','Calorie','Kilocalorie','Wh','kWh','BTU'], toBase:[1,1000,4.184,4184,3600,3600000,1055.06] },
+  temp:  { units:['Celsius','Fahrenheit','Kelvin'], toBase:null }
+};
+
+function populateSel(sel,units,def){
+  sel.innerHTML=units.map((u,i)=>`<option value="${i}"${i===def?' selected':''}>${u}</option>`).join('');
+}
+function updateConvUnits(){
+  const cat=document.getElementById('conv-cat').value;
+  const d=convData[cat];
+  populateSel(document.getElementById('conv-from'),d.units,0);
+  populateSel(document.getElementById('conv-to'),d.units,1);
+  convertUnits();
+}
+function convertUnits(){
+  const cat=document.getElementById('conv-cat').value;
+  const from=parseInt(document.getElementById('conv-from').value);
+  const to=parseInt(document.getElementById('conv-to').value);
+  const val=parseFloat(document.getElementById('conv-val').value);
+  const res=document.getElementById('conv-result');
+  if(isNaN(val)){res.textContent='—';return;}
+  let result;
+  if(cat==='temp'){
+    let c= from===0?val: from===1?(val-32)*5/9: val-273.15;
+    result= to===0?c: to===1?c*9/5+32: c+273.15;
+  } else {
+    const d=convData[cat];
+    result=(val*d.toBase[from])/d.toBase[to];
+  }
+  result=parseFloat(result.toPrecision(10));
+  const fn=convData[cat].units[from], tn=convData[cat].units[to];
+  res.textContent=`${val} ${fn}  =  ${result} ${tn}`;
+  res.dataset.val=result;
+}
+function sendConvToCalc(){
+  const v=document.getElementById('conv-result').dataset.val;
+  if(!v) return;
+  current=v; updateDisplay(current);
+  switchTab('calc',document.querySelector('.tab'));
+}
+
+updateConvUnits();
+</script>
+</body>
+</html>
